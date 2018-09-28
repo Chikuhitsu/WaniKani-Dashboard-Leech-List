@@ -1,117 +1,149 @@
 // ==UserScript==
 // @name          WaniKani Dashboard Leech List
 // @namespace     https://www.wanikani.com
-// @description   Show SRS and leech breakdown on dashboard
+// @description   Shows top leeches on dashboard (replaces critical items) and all leeches on a dedicated page (replaces critical items)
 // @author        ukebox
-// @version       1.1.0
+// @version       1.2.1
+// @require       https://code.jquery.com/jquery-3.3.1.min.js#sha256=FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=
+// @require       https://cdn.jsdelivr.net/npm/@iconfu/svg-inject@1.0.5/dist/svg-inject.min.js#sha256=HRZfUR7ozgnjacG4J44e4QBkqBa3r0e8WaW+Y/Azb8o=
 // @include       https://www.wanikani.com/dashboard
 // @include       https://www.wanikani.com/
+// @include       https://www.wanikani.com/critical-items
 // @grant         none
+// @run-at        document-end
 // ==/UserScript==
+
+/*
+jshint esversion: 6
+*/
 
 (function() {
     'use strict';
 
-	if (!window.wkof) {
-		let response = confirm('WaniKani Dashboard Leech List script requires WaniKani Open Framework.\n Click "OK" to be forwarded to installation instructions.');
+    let dom = {};
+    dom.$ = jQuery.noConflict(true);
 
-		if (response) {
-			window.location.href = 'https://community.wanikani.com/t/instructions-installing-wanikani-open-framework/28549';
-		}
+    //custom style for radical svg's - white strokes, fixed size
+    dom.$('head').append(`<style type="text/css">
+                            svg.radical {
+                              fill: none;
+                              stroke: #fff;
+                              stroke-width: 68;
+                              stroke-linecap: square;
+                              stroke-miterlimit: 2;
+                              shape-rendering: geometricPrecision;
+                              height: 1em;
+                              width: 1em;
+                            }
+                          </style>`);
 
-		return;
-	}
+    if (!window.wkof) {
+        let response = confirm('WaniKani Dashboard Leech List script requires WaniKani Open Framework.\n Click "OK" to be forwarded to installation instructions.');
 
-	const leechThreshold = 1;
-	const config = {
-		wk_items: {
-			options: {
-				review_statistics: true,
-				assignments: true
-			}
-		}
-	};
-    let allItems
+        if (response) {
+            window.location.href = 'https://community.wanikani.com/t/instructions-installing-wanikani-open-framework/28549';
+        }
 
-	wkof.include('ItemData');
-	wkof.ready('ItemData').then(getItems).then(getLeechScores).then(updatePage);
+        return;
+    }
 
-	function getItems(items) {
-		return wkof.ItemData.get_items(config).then(filterToActiveAssignments);
-	}
+    const leechThreshold = 1;
+    const config = {
+        wk_items: {
+            options: {
+                review_statistics: true,
+                assignments: true
+            },
+            filter: {
+                srs: '1..8'
+            }
+        }
+    };
 
-	function filterToActiveAssignments(items) {
-		return items.filter(itemIsActiveAssignment);
-	}
+    window.wkof.include('ItemData');
+    window.wkof.ready('ItemData').then(getItems).then(getLeeches).then(updatePage);
 
-	function itemIsActiveAssignment(item) {
-		let assignments = item.assignments;
-		if (assignments === undefined) {
-			return false;
-		}
+    function getItems(items) {
+        return window.wkof.ItemData.get_items(config);
+    }
 
-		let srsStage = getSrsStage(assignments);
+    function getLeeches(items) {
+        return items.filter(item => isLeech(item));
+    }
 
-		return srsStage >= 1 && srsStage <= 8;
-	}
+    function isLeech(item) {
+        if (item.review_statistics === undefined) {
+            return false;
+        }
 
-    function getSrsStage(assignments) {
-		return assignments.srs_stage;
-	}
+        let reviewStats = item.review_statistics;
+        let meaningScore = getLeechScore(reviewStats.meaning_incorrect, reviewStats.meaning_current_streak);
+        let readingScore = getLeechScore(reviewStats.reading_incorrect, reviewStats.reading_current_streak);
 
-	function getLeechScores(items) {
+        item.leech_score = Math.max(meaningScore, readingScore);
 
-		items.forEach(function(item) {
-			isLeech(item)
-		});
+        return meaningScore >= leechThreshold || readingScore >= leechThreshold;
+    }
 
-		return items;
-	}
+    function getLeechScore(incorrect, currentStreak) {
+        return incorrect / Math.pow((currentStreak || 0.5), 1.5);
+    }
 
-	function isLeech(item) {
-		if (item.review_statistics === undefined) {
-			return false;
-		}
+    function updatePage(items) {
 
-		let reviewStats = item.review_statistics;
-		let meaningScore = getLeechScore(reviewStats.meaning_incorrect, reviewStats.meaning_current_streak);
-		let readingScore = getLeechScore(reviewStats.reading_incorrect, reviewStats.reading_current_streak);
+        let is_dashboard = window.location.pathname != "/critical-items";
 
-        item.leech_score = Math.max(meaningScore, readingScore)
+        if (is_dashboard) {
+            items = items.sort((a, b) => b.leech_score - a.leech_score).slice(0,10);
+        } else {
+            items = items.sort((a, b) => b.leech_score - a.leech_score);
+        }
 
-		return meaningScore >= leechThreshold || readingScore >= leechThreshold;
-	}
+        console.log(items);
 
-	function getLeechScore(incorrect, currentStreak) {
-		return incorrect / Math.pow((currentStreak || 0.5), 1.5);
-	}
+        makeLeechList(items, is_dashboard);
+    }
 
-	function updatePage(items) {
+    function round(number, decimals)
+    {
+        return +(Math.round(number + "e+" + decimals) + "e-" + decimals);
+    }
 
-        items = items.sort(function(a, b){return b.leech_score - a.leech_score}).slice(0,10);
+    function makeLeechList(items, for_dashboard) {
+        var rows = "";
+        items.forEach(item => {
+            let type = item.assignments.subject_type;
+            let representation = "";
 
-        console.log(items)
+            //The slug of a radical just has its name, we want the actual symbol
+            if (type === "radical" && item.data.character_images && !item.data.characters) {
+                let image_data = item.data.character_images.find(x => x.content_type === "image/svg+xml" && !x.metadata.inline_styles);
+                if (image_data) {
+                    //svg injection - this injects the svg directly into the html, which allows for custom CSS styling
+                    representation = `<img style="height: 1em; width: 1em;" src="${image_data.url}" onload="SVGInject(this)" />`;
+                }
+            } else if (type === 'radical' && item.data.characters) {
+                //use characters for radicals when possible
+                representation = item.data.characters;
+            } else {
+                //use slug for kanji and vocab
+                representation = item.data.slug;
+            }
 
-        addTopLeechList(items)
-	}
-  function round(number, decimals)
-      {
-          return +(Math.round(number + "e+" + decimals) + "e-" + decimals);
-      }
+            let row = `<tr class="${item.object}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
+            rows+=row;
+        });
 
-      function addTopLeechList(topLeeches) {
-          var rows = ""
-          topLeeches.forEach(function(item) {
-              let row = `<tr class="${item.object}"><td><a href="${item.data.document_url}"><span lang="ja">${item.data.slug}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`
-              rows+=row;
-          });
+        let sectionContent = `<h3 class="small-caps">${for_dashboard ? 'Top ' : ''}Leeches</h3>
+                              <table>
+                                <tbody style="display: table-row-group;">
+                                  ${rows}
+                                </tbody>
+                              </table>
+                              <div class="see-more">
+                                <a class="small-caps" ${for_dashboard ? 'href="critical-items"' : ''}>${for_dashboard ? 'See More Leeches...' : items.length + ' leeches total'}</a>
+                              </div>`;
+        dom.$('.low-percentage').html(sectionContent);
+    }
 
-          let sectionContent = `<h3 class="small-caps">Top Leeches</h3>
-                    <table>
-                      <tbody style="display: table-row-group;">
-                        ${rows}
-                      </tbody>
-                    </table>`
-          $('.low-percentage').html(sectionContent)
-      }
 })();
