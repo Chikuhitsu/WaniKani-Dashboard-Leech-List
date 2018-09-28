@@ -5,7 +5,7 @@
 // @author        ukebox
 // @version       1.2.1
 // @require       https://code.jquery.com/jquery-3.3.1.min.js#sha256=FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=
-// @require       https://cdn.jsdelivr.net/npm/@iconfu/svg-inject@1.0.5/dist/svg-inject.min.js#sha256=HRZfUR7ozgnjacG4J44e4QBkqBa3r0e8WaW+Y/Azb8o=
+// @require       https://cdn.jsdelivr.net/npm/@iconfu/svg-inject@1.1.0/dist/svg-inject.min.js#sha256=17tRsiOaKJXzcL1V8IHHvTe/7LMf+LA4xPVUEPx7Ako=
 // @include       https://www.wanikani.com/dashboard
 // @include       https://www.wanikani.com/
 // @include       https://www.wanikani.com/critical-items
@@ -55,6 +55,7 @@ jshint esversion: 6
                 assignments: true
             },
             filter: {
+                level: '1..+0',
                 srs: '1..8'
             }
         }
@@ -130,7 +131,7 @@ jshint esversion: 6
                 representation = item.data.slug;
             }
 
-            let row = `<tr class="${item.object}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
+            let row = `<tr class="${item.item.assignments.subject_type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
             rows+=row;
         });
 
