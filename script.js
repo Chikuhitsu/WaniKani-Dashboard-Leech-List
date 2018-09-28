@@ -3,7 +3,7 @@
 // @namespace     https://www.wanikani.com
 // @description   Shows top leeches on dashboard (replaces critical items) and all leeches on a dedicated page (replaces critical items)
 // @author        ukebox
-// @version       1.2.1
+// @version       1.2.2
 // @require       https://code.jquery.com/jquery-3.3.1.min.js#sha256=FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=
 // @require       https://cdn.jsdelivr.net/npm/@iconfu/svg-inject@1.1.0/dist/svg-inject.min.js#sha256=17tRsiOaKJXzcL1V8IHHvTe/7LMf+LA4xPVUEPx7Ako=
 // @include       https://www.wanikani.com/dashboard
@@ -62,13 +62,13 @@ jshint esversion: 6
     };
 
     window.wkof.include('ItemData');
-    window.wkof.ready('ItemData').then(getItems).then(getLeeches).then(updatePage);
+    window.wkof.ready('ItemData').then(getItems).then(determineLeeches).then(updatePage);
 
-    function getItems(items) {
+    function getItems() {
         return window.wkof.ItemData.get_items(config);
     }
 
-    function getLeeches(items) {
+    function determineLeeches(items) {
         return items.filter(item => isLeech(item));
     }
 
@@ -78,21 +78,21 @@ jshint esversion: 6
         }
 
         let reviewStats = item.review_statistics;
-        let meaningScore = getLeechScore(reviewStats.meaning_incorrect, reviewStats.meaning_current_streak);
-        let readingScore = getLeechScore(reviewStats.reading_incorrect, reviewStats.reading_current_streak);
+        let meaningScore = computeLeechScore(reviewStats.meaning_incorrect, reviewStats.meaning_current_streak);
+        let readingScore = computeLeechScore(reviewStats.reading_incorrect, reviewStats.reading_current_streak);
 
         item.leech_score = Math.max(meaningScore, readingScore);
 
         return meaningScore >= leechThreshold || readingScore >= leechThreshold;
     }
 
-    function getLeechScore(incorrect, currentStreak) {
+    function computeLeechScore(incorrect, currentStreak) {
         return incorrect / Math.pow((currentStreak || 0.5), 1.5);
     }
 
     function updatePage(items) {
 
-        let is_dashboard = window.location.pathname != "/critical-items";
+        let is_dashboard = window.location.pathname !== "/critical-items";
 
         if (is_dashboard) {
             items = items.sort((a, b) => b.leech_score - a.leech_score).slice(0,10);
@@ -111,7 +111,7 @@ jshint esversion: 6
     }
 
     function makeLeechList(items, for_dashboard) {
-        var rows = "";
+        let rows = "";
         items.forEach(item => {
             let type = item.assignments.subject_type;
             let representation = "";
@@ -131,8 +131,7 @@ jshint esversion: 6
                 representation = item.data.slug;
             }
 
-            let row = `<tr class="${item.item.assignments.subject_type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
-            rows+=row;
+            rows+=`<tr class="${item.item.assignments.subject_type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
         });
 
         let sectionContent = `<h3 class="small-caps">${for_dashboard ? 'Top ' : ''}Leeches</h3>
