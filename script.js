@@ -131,7 +131,7 @@ jshint esversion: 6
                 representation = item.data.slug;
             }
 
-            rows+=`<tr class="${item.item.assignments.subject_type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
+            rows+=`<tr class="${type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
         });
 
         let sectionContent = `<h3 class="small-caps">${for_dashboard ? 'Top ' : ''}Leeches</h3>
