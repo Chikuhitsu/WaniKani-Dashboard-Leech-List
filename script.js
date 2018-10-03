@@ -3,9 +3,8 @@
 // @namespace     https://www.wanikani.com
 // @description   Shows top leeches on dashboard (replaces critical items) and all leeches on a dedicated page (replaces critical items)
 // @author        ukebox
-// @version       1.2.2
+// @version       1.2.3
 // @require       https://code.jquery.com/jquery-3.3.1.min.js#sha256=FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=
-// @require       https://cdn.jsdelivr.net/npm/@iconfu/svg-inject@1.1.0/dist/svg-inject.min.js#sha256=17tRsiOaKJXzcL1V8IHHvTe/7LMf+LA4xPVUEPx7Ako=
 // @include       https://www.wanikani.com/dashboard
 // @include       https://www.wanikani.com/
 // @include       https://www.wanikani.com/critical-items
@@ -22,20 +21,6 @@ jshint esversion: 6
 
     let dom = {};
     dom.$ = jQuery.noConflict(true);
-
-    //custom style for radical svg's - white strokes, fixed size
-    dom.$('head').append(`<style type="text/css">
-                            svg.radical {
-                              fill: none;
-                              stroke: #fff;
-                              stroke-width: 68;
-                              stroke-linecap: square;
-                              stroke-miterlimit: 2;
-                              shape-rendering: geometricPrecision;
-                              height: 1em;
-                              width: 1em;
-                            }
-                          </style>`);
 
     if (!window.wkof) {
         let response = confirm('WaniKani Dashboard Leech List script requires WaniKani Open Framework.\n Click "OK" to be forwarded to installation instructions.');
@@ -112,23 +97,24 @@ jshint esversion: 6
 
     function makeLeechList(items, for_dashboard) {
         let rows = "";
+
         items.forEach(item => {
             let type = item.assignments.subject_type;
-            let representation = "";
+            //use slug by default (for kanji and vocab)
+            let representation = item.data.slug;
 
-            //The slug of a radical just has its name, we want the actual symbol
-            if (type === "radical" && item.data.character_images && !item.data.characters) {
-                let image_data = item.data.character_images.find(x => x.content_type === "image/svg+xml" && !x.metadata.inline_styles);
-                if (image_data) {
-                    //svg injection - this injects the svg directly into the html, which allows for custom CSS styling
-                    representation = `<img style="height: 1em; width: 1em;" src="${image_data.url}" onload="SVGInject(this)" />`;
+            //The slug of a radical just has its name, we want the actual symbol.
+            if (type === 'radical') {
+                if (item.data.characters) {
+                    //use characters for radicals when possible
+                    representation = item.data.characters;
+                } else if (item.data.character_images) {
+                    //use SVG image for scalability
+                    let image_data = item.data.character_images.find(x => x.content_type === "image/svg+xml" && x.metadata.inline_styles);
+                    if (image_data) {
+                        representation = `<img style="height: 1em; width: 1em; filter: invert(100%);" src="${image_data.url}" />`;
+                    }
                 }
-            } else if (type === 'radical' && item.data.characters) {
-                //use characters for radicals when possible
-                representation = item.data.characters;
-            } else {
-                //use slug for kanji and vocab
-                representation = item.data.slug;
             }
 
             rows+=`<tr class="${type}"><td><a href="${item.data.document_url}"><span lang="ja">${representation}</span><span class="pull-right">${round(item.leech_score, 2)}</span></a></td></tr>`;
